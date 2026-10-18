@@ -33,13 +33,14 @@ API = "https://music.163.com/api"
 
 # 巡演/Live/精选/合辑/伴奏/翻唱等不属于「录音室专辑」的标记
 DEFAULT_EXCLUDE = ("演唱会,音乐会,拉阔,现场,Concert,Tour,Dome,Unplugged,"
-                   "精选,精选集,合辑,Greatest,Best of,Anthology,Collection,Essential,"
-                   "Number Ones,Gold,Box set,Box Set,Vision,Ultimate,Definitive,Legends,"
+                   "精选,精选集,合辑,Greatest,Best of,Anthology,Essential,"
+                   "Number Ones,Box set,Box Set,Ultimate,Definitive,"
                    "伴奏,Instrumental,Karaoke,翻唱,Tribute,Cover,Remix,Mix,Mixes,"
                    "Broadcast,FM Broadcast,Repackage,改版,原声带特辑,Highlights")
-# "Live" 不能当子串匹配（会误杀《Live For Today》这类正式专辑），只在明确是现场录音时才算
-LIVE_PATTERNS = (r"\(live\)", r"\[live\]", r"\blive\s+(in|at)\b", r"\blive\s+\d{4}\b",
-                 r"-\s*live\b", r"\blive\s*$", r"\blive\s+(tour|session|version|album|ep|cd|show)\b")
+# "Live" 判定：前后不能是英文字母，这样能抓住「Live全纪录」「D.N.A LIVE」这类紧邻中文/标点的写法，
+# 又不会误伤 ALIVE / Alive / Deliver。个别以 Live 开头的正式专辑放进白名单。
+LIVE_PATTERN = r"(?<![a-z])live(?![a-z])"
+LIVE_WHITELIST = ("live for today",)
 # 版本修饰（不排除，只降级：撞歌时让正式版占位）
 BAD_VER = ("remaster", "deluxe", "edited", "rough mix", "expanded", "bonus",
            "special edition", "anniversary", "complete edition", "重制", "纪念版")
@@ -137,7 +138,9 @@ def fmt_date(ms):
 
 def is_live_name(name):
     n = (name or "").lower()
-    return any(re.search(p, n) for p in LIVE_PATTERNS)
+    if any(w in n for w in LIVE_WHITELIST):
+        return False
+    return re.search(LIVE_PATTERN, n) is not None
 
 
 def is_alt_name(name):
@@ -169,7 +172,15 @@ def main():
     albums = list_albums(aid)
     raw_n = len(albums)
 
-    # 同一张专辑在曲库里可能有多个条目（版本不同、曲目数不同）：按归一化名字合并，留曲目最多的
+    # 先按类型过滤，再合并重复条目。
+    # 顺序不能反：同名条目里常有 "单曲版（1 首）" 与 "专辑版（12 首）" 并存，
+    # 先合并会选中单曲版，随后被类型过滤整组淘汰（曾导致 The Weeknd《Kiss Land》整张丢失）。
+    want = {t.strip().lower() for t in args.types.replace("，", ",").split(",") if t.strip()}
+    if "all" not in want:
+        albums = [a for a in albums if (a.get("type") or "").strip().lower() in want]
+    typed_n = len(albums)
+
+    # 同一张专辑在曲库里可能有多个条目（版本不同、曲目数不同）：按归一化名字合并
     groups = collections.OrderedDict()
     for a in albums:
         groups.setdefault(norm_album(a.get("name") or ""), []).append(a)
@@ -184,9 +195,6 @@ def main():
         merged.append(best)
     albums = merged
 
-    want = {t.strip().lower() for t in args.types.replace("，", ",").split(",") if t.strip()}
-    if "all" not in want:
-        albums = [a for a in albums if (a.get("type") or "").strip().lower() in want]
     if args.min_tracks > 0:
         albums = [a for a in albums if (a.get("size") or 0) >= args.min_tracks]
 
@@ -196,8 +204,7 @@ def main():
         name = (a.get("name") or "")
         hit = next((k for k in kw if k.lower() in name.lower()), None)
         if not hit and not args.keep_all:
-            m = next((p for p in LIVE_PATTERNS if re.search(p, name.lower())), None)
-            if m:
+            if is_live_name(name):
                 hit = "Live 现场录音"
         (dropped.append((a, hit)) if hit else kept_al.append(a))
     albums = [a for a in kept_al if (a.get("size") or 0) > 0]
@@ -216,7 +223,7 @@ def main():
         albums = [a for a in albums if (a.get("publishTime") or 0) >= cutoff]
     albums.sort(key=lambda a: (a.get("publishTime") or 0, a.get("name") or ""))
 
-    print(f"[{args.artist}] 原始 {raw_n} 张 → 合并重复条目后 {len(groups)} 张 → 入选 {len(albums)} 张", flush=True)
+    print(f"[{args.artist}] 原始 {raw_n} 张 → 类型命中 {typed_n} 张 → 合并重复后 {len(groups)} 张 → 入选 {len(albums)} 张", flush=True)
 
     order = [i for i, a in enumerate(albums) if not is_alt_name(a.get("name"))] + \
             [i for i, a in enumerate(albums) if is_alt_name(a.get("name"))]
@@ -232,17 +239,16 @@ def main():
             continue
         is_ost = any(k.lower() in (al.get("name") or "").lower()
                      for k in ("原声带", "原声", "OST", "Soundtrack"))
-        if is_ost:
-            # 原声带分两类：本人主导的电影原声（整张保留）与多人拼盘（本人只占一两首，属合辑）
-            named = [t for t in tracks if t["artists"]]
-            self_cnt = sum(1 for t in named
-                           if any(aname == n or aname in n or n in aname for n in t["artists"]))
-            ratio = self_cnt / len(tracks) if tracks else 0
-            if ratio < 0.3:
-                zero_note.append((al["name"], f"原声带拼盘，本人仅 {self_cnt}/{len(tracks)} 首"))
-                print(f"  [{step:02d}/{len(albums)}] {date} {al['name'][:36]} (跳过：本人占比 {ratio:.0%})", flush=True)
-                time.sleep(0.3)
-                continue
+        named = [t for t in tracks if t["artists"]]
+        self_cnt = sum(1 for t in named
+                       if any(aname == n or aname in n or n in aname for n in t["artists"]))
+        ratio = self_cnt / len(tracks) if tracks else 0
+        # 拼盘判定：原声带本人占比 <30%，或普通专辑曲目≥8 而本人占比 <20%，都视为合辑而非个人作品
+        if (is_ost and ratio < 0.3) or (len(tracks) >= 8 and not is_ost and ratio < 0.2):
+            zero_note.append((al["name"], f"{'原声带拼盘' if is_ost else '合辑拼盘'}，本人仅 {self_cnt}/{len(tracks)} 首"))
+            print(f"  [{step:02d}/{len(albums)}] {date} {al['name'][:36]} (跳过：本人占比 {ratio:.0%})", flush=True)
+            time.sleep(0.3)
+            continue
         kept = other = dup = 0
         for t in tracks:
             if not t["name"]:
@@ -303,7 +309,7 @@ def main():
         f.write("## 筛选依据\n\n")
         f.write(f"1. **只取专辑曲目**：专辑类型筛选为 `{args.types}`，"
                 f"单曲（Single）、EP、精选集不进歌单。曲库共 {raw_n} 条记录，"
-                f"合并同专辑重复条目后 {len(groups)} 张。\n")
+                f"类型命中 {typed_n} 张，合并同专辑重复条目后 {len(groups)} 张。\n")
         f.write("2. **排除非录音室专辑**：专辑名命中 "
                 f"`{'/'.join(kw) if kw else '（未启用）'}` 的整张跳过，"
                 f"包括巡演、现场、精选、合辑、伴奏版等。\n")

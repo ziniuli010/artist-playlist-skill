@@ -31,19 +31,23 @@ Concert Tour Dome Unplugged
 
 ### S3 Live 判定（防误杀）
 
-`Live` **不做子串匹配**，因为会误杀《Live For Today》这类正式专辑。仅在下列形态判定为现场录音：
+`Live` **不做子串匹配**（会误杀 `ALIVE`、`Deliver`、`Live For Today`），而是用「前后不能是英文字母」的词边界判定：
 
-| 正则 | 命中示例 |
-|---|---|
-| `\(live\)` | `Get A Life (Live)` |
-| `\[live\]` | `Tour [Live]` |
-| `\blive\s+(in|at)\b` | `Live at Wembley` |
-| `\blive\s+\d{4}\b` | `MOOV Live 2009` |
-| `-\s*live\b` | `XX - Live` |
-| `\blive\s*$` | `Third Encounter Live` |
-| `\blive\s+(tour|session|version)\b` | `Live Session` |
+```regex
+(?<![a-z])live(?![a-z])
+```
 
-不命中以上形态的 `Live` 一律保留（如 `Live For Today`）。
+| 专辑名 | 判定 | 原因 |
+|---|---|---|
+| `Get A Life (Live)` | 现场 | 前方是 `(`，后方是 `)` |
+| `台北市立体育场Live全纪录` | 现场 | 中文不是英文字母，边界成立 |
+| `D.N.A LIVE 创记录音` | 现场 | 前后是空格 |
+| `MOOV Live 2009 陈奕迅` | 现场 | 前后是空格/数字 |
+| `ALIVE` | 保留 | 前有 `A`，边界不成立 |
+| `Deliver` | 保留 | 前有 `r` |
+| `Live For Today`（陈奕迅 2003 正式专辑） | 保留 | 命中白名单 `LIVE_WHITELIST` |
+
+白名单机制：`LIVE_WHITELIST = ("live for today",)`，用于放行名字里带 Live 但确为录音室专辑的作品。新增白名单时请同时补 `references/troubleshooting.md` 的案例。
 
 ### S4 演唱者过滤
 
