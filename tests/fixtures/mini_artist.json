@@ -1,0 +1,76 @@
+{
+  "artist": "测试歌手",
+  "_comment": "离线回归样本：覆盖类型过滤、同专辑合并、正式版优先、Live 排除、精选排除、拼盘判定、原声带豁免、跨专辑去重、时间排序。",
+  "albums": [
+    {"id": "a1", "name": "首张专辑", "type": "专辑", "size": 3, "date": "2010-01-01"},
+    {"id": "a2", "name": "首张专辑 (Deluxe Edition)", "type": "专辑", "size": 4, "date": "2010-01-01"},
+    {"id": "a3", "name": "某某演唱会 Live 全纪录", "type": "专辑", "size": 5, "date": "2011-05-01"},
+    {"id": "a4", "name": "黄金精选集", "type": "精选集", "size": 5, "date": "2012-01-01"},
+    {"id": "a5", "name": "第二张", "type": "专辑", "size": 3, "date": "2013-03-01"},
+    {"id": "a6", "name": "群星合作企划", "type": "专辑", "size": 8, "date": "2014-01-01"},
+    {"id": "a7", "name": "某电影原声带", "type": "专辑", "size": 5, "date": "2015-06-01"},
+    {"id": "a8", "name": "另一部电视剧原声带", "type": "专辑", "size": 10, "date": "2016-01-01"},
+    {"id": "a9", "name": "抢跑单曲", "type": "Single", "size": 1, "date": "2009-01-01"}
+  ],
+  "tracks": {
+    "a1": [
+      {"no": 1, "name": "甲", "artists": ["测试歌手"]},
+      {"no": 2, "name": "乙", "artists": ["测试歌手"]},
+      {"no": 3, "name": "丙", "artists": ["测试歌手"]}
+    ],
+    "a2": [
+      {"no": 1, "name": "甲", "artists": ["测试歌手"]},
+      {"no": 2, "name": "乙", "artists": ["测试歌手"]},
+      {"no": 3, "name": "丙", "artists": ["测试歌手"]},
+      {"no": 4, "name": "丁", "artists": ["测试歌手"]}
+    ],
+    "a3": [
+      {"no": 1, "name": "甲 (Live)", "artists": ["测试歌手"]},
+      {"no": 2, "name": "乙 (Live)", "artists": ["测试歌手"]},
+      {"no": 3, "name": "现场闲聊", "artists": ["测试歌手"]},
+      {"no": 4, "name": "丙 (Live)", "artists": ["测试歌手"]},
+      {"no": 5, "name": "丁 (Live)", "artists": ["测试歌手"]}
+    ],
+    "a4": [
+      {"no": 1, "name": "甲", "artists": ["测试歌手"]},
+      {"no": 2, "name": "乙", "artists": ["测试歌手"]}
+    ],
+    "a5": [
+      {"no": 1, "name": "戊", "artists": ["测试歌手"]},
+      {"no": 2, "name": "己", "artists": ["测试歌手"]},
+      {"no": 3, "name": "甲", "artists": ["测试歌手"]}
+    ],
+    "a6": [
+      {"no": 1, "name": "众星合唱作品", "artists": ["测试歌手", "别人"]},
+      {"no": 2, "name": "别人的歌一", "artists": ["别人"]},
+      {"no": 3, "name": "别人的歌二", "artists": ["别人"]},
+      {"no": 4, "name": "别人的歌三", "artists": ["别人"]},
+      {"no": 5, "name": "别人的歌四", "artists": ["别人"]},
+      {"no": 6, "name": "别人的歌五", "artists": ["别人"]},
+      {"no": 7, "name": "别人的歌六", "artists": ["别人"]},
+      {"no": 8, "name": "别人的歌七", "artists": ["别人"]}
+    ],
+    "a7": [
+      {"no": 1, "name": "主题曲", "artists": ["测试歌手"]},
+      {"no": 2, "name": "插曲", "artists": ["测试歌手"]},
+      {"no": 3, "name": "片尾曲", "artists": ["测试歌手"]},
+      {"no": 4, "name": "配乐一", "artists": ["配乐师"]},
+      {"no": 5, "name": "配乐二", "artists": ["配乐师"]}
+    ],
+    "a8": [
+      {"no": 1, "name": "路过一首", "artists": ["测试歌手"]},
+      {"no": 2, "name": "拼盘二", "artists": ["别人"]},
+      {"no": 3, "name": "拼盘三", "artists": ["别人"]},
+      {"no": 4, "name": "拼盘四", "artists": ["别人"]},
+      {"no": 5, "name": "拼盘五", "artists": ["别人"]},
+      {"no": 6, "name": "拼盘六", "artists": ["别人"]},
+      {"no": 7, "name": "拼盘七", "artists": ["别人"]},
+      {"no": 8, "name": "拼盘八", "artists": ["别人"]},
+      {"no": 9, "name": "拼盘九", "artists": ["别人"]},
+      {"no": 10, "name": "拼盘十", "artists": ["别人"]}
+    ],
+    "a9": [
+      {"no": 1, "name": "抢跑", "artists": ["测试歌手"]}
+    ]
+  }
+}

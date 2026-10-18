@@ -23,3 +23,8 @@ Thumbs.db
 *.pem
 secrets.*
 config.local.*
+
+# 打包产物
+*.egg-info/
+build/
+dist/

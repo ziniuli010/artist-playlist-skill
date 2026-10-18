@@ -43,6 +43,7 @@ license: MIT
 | `--include-featured` | 否 | 关 | 保留他人演唱曲目（合作合辑场景） |
 | `--since` | 否 | 空 | 增量模式，只处理该日期（`YYYY-MM-DD`）及之后发行的专辑 |
 | `--xalbum` | 否 | 空 | 精确排除指定专辑（子串匹配，逗号分隔），用于剔除曲库脏数据 |
+| `--source` | 否 | `auto` | 数据源：`auto`（主源失败自动降级）/ `netease` / `musicbrainz` |
 | `--outdir` | 否 | `./歌单` | 输出根目录 |
 
 ### 输出
@@ -59,26 +60,49 @@ license: MIT
 ## 三、目录结构
 
 ```
-artist-playlist-skill/
+artist-playlist/
 ├── SKILL.md                     # 本文件：能力说明、用法、规则总纲
-├── README.md                    # 仓库首页：快速上手
+├── README.md                    # 仓库首页：快速上手、平台导入说明
+├── CHANGELOG.md                 # 版本记录（Keep a Changelog）
+├── CONTRIBUTING.md              # 改规则的正确姿势、提交流程
 ├── LICENSE                      # MIT
+├── pyproject.toml               # 包元数据，支持 pip install
+├── artist_playlist.py           # 命令行入口包装
 ├── scripts/
-│   └── build_discography.py     # 唯一入口脚本，零第三方依赖
+│   ├── build_discography.py     # 主脚本：CLI + 纯函数 build_records()
+│   ├── validate_skill.py        # SKILL 元数据与包完整性自检
+│   └── sources/                 # 数据源适配层
+│       ├── __init__.py          # get_source()，含自动降级
+│       ├── base.py              # Source 抽象 + pick_artist()
+│       ├── netease.py           # 主源
+│       └── musicbrainz.py       # 备源
+├── tests/
+│   ├── test_rules.py            # 26 个离线用例
+│   └── fixtures/mini_artist.json# 覆盖 9 类规则的固定样本
+├── schema/
+│   └── playlist.schema.json     # 曲目记录字段 Schema
 ├── references/
 │   ├── fields.md                # 歌单字段逐项说明与取值
 │   ├── rules.md                 # 筛选/去重/排序/更新的完整判定规则
 │   └── troubleshooting.md       # 匹配失败、重复条目、空专辑等排查
-└── examples/
-    └── example-chen-yixun.md    # 真实产出片段（含筛选依据样例）
+├── examples/
+│   └── example-chen-yixun.md    # 真实产出片段（含筛选依据样例）
+└── .github/workflows/ci.yml     # CI：ruff + 元数据检查 + 单测 + CLI 冒烟
 ```
 
 ## 四、使用方式
 
 ### 环境要求
 
-- Python 3.8+，**仅标准库**，无需 pip 安装
-- 可访问 `music.163.com`（曲库元数据来源）
+- Python 3.9+，**运行时仅标准库**，无需 pip 安装
+- 可访问 `music.163.com`（主源）；不可用时自动降级到 MusicBrainz
+
+### 安装（可选）
+
+```bash
+pipx install git+https://github.com/ziniuli010/artist-playlist-skill.git
+artist-playlist "陈奕迅"
+```
 
 ### 运行
 
@@ -88,6 +112,9 @@ python3 scripts/build_discography.py "陈奕迅"
 
 # 指定输出目录
 python3 scripts/build_discography.py "五月天" --outdir ./歌单
+
+# 主源不可用，走备源
+python3 scripts/build_discography.py "The Weeknd" --source musicbrainz
 
 # 批量（每位歌手独立目录）
 for a in "陈奕迅" "邓紫棋" "五月天"; do
@@ -100,6 +127,26 @@ done
 把本目录放入 `~/.workbuddy/skills/artist-playlist/`（用户级）或 `<项目>/.workbuddy/skills/artist-playlist/`（项目级），即可在对话中用自然语言触发，例如：
 
 > 用 artist-playlist 整理邓紫棋、方大同的独立歌单，每人一份
+
+### 数据源与降级
+
+| 源 | 角色 | 字段 |
+|---|---|---|
+| 网易云公开元数据 `netease` | 主源 | 专辑类型、发行日期、曲序、曲目演唱者齐全 |
+| MusicBrainz 开放数据 `musicbrainz` | 备源 | 只有 release-group 粒度，类型无「精选集」概念，曲目名可能是罗马字 |
+
+`--source auto`（默认）先探测主源，失败则降级。降级时：
+
+- 输出文件顶部写入「数据源降级」提示与主源错误原因
+- 演唱者过滤自动放宽（跨语种源的名字可能与曲目署名不一致，收紧会误杀全部曲目）
+- 建议核对后再使用，或等主源恢复后重跑
+
+### 自检与测试
+
+```bash
+python scripts/validate_skill.py   # 元数据、引用路径、脚本可编译
+python -m pytest -q                # 26 个离线用例，不联网
+```
 
 ## 五、歌单字段说明
 
@@ -217,6 +264,8 @@ python3 scripts/build_discography.py "方大同" --no-dedupe
 3. **现场专辑识别**：若巡演专辑名本身不含任何现场标记（如以巡演名直接命名），会被当作录音室专辑收录。
 4. **元数据时效**：曲库专辑列表随上下架变化，同一歌手不同日期运行结果可能略有差异。
 5. **不处理音频**：仅读取公开元数据，不下载、不转码、不分发任何音频内容。
+6. **降级源质量下降**：走 MusicBrainz 时中文歌手名多为繁体、曲名可能为罗马字，匹配率与字段完整度都低于主源，输出会明确标注。
+7. **macOS 客户端无法导入**：QQ 音乐 Mac 版（实测 11.10.5）没有「导入外部歌单/文字导入」入口，需在手机 App 导入后靠账号同步。
 
 ## 九、安全与合规
 

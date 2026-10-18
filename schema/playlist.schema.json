@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ziniuli010/artist-playlist-skill/schema/playlist.schema.json",
+  "title": "PlaylistRecord",
+  "description": "歌单中单条曲目记录。CSV 的每一行、Markdown 表格的每一行都对应一个该对象。字段语义见 references/fields.md。",
+  "type": "object",
+  "required": ["title", "album", "date", "year", "atype", "no", "singer"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "曲目原名，保留版本后缀（如 (Live) 不剥离）"
+    },
+    "album": {
+      "type": "string",
+      "minLength": 1,
+      "description": "所属专辑名"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^$|^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "专辑发行日期 YYYY-MM-DD，缺失时为空串"
+    },
+    "year": {
+      "type": "string",
+      "pattern": "^$|^\\d{4}$",
+      "description": "发行年份，由 date 截取"
+    },
+    "atype": {
+      "type": "string",
+      "enum": ["专辑", "EP", "Single", "精选集", "其他", ""],
+      "description": "曲库标注的专辑类型"
+    },
+    "no": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "专辑内原始曲序，0 表示缺失"
+    },
+    "singer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "演唱者；--singers full 时以 / 连接多位"
+    }
+  },
+  "examples": [
+    {
+      "title": "富士山下",
+      "album": "What's Going On...?",
+      "date": "2006-11-17",
+      "year": "2006",
+      "atype": "专辑",
+      "no": 3,
+      "singer": "陈奕迅"
+    }
+  ]
+}
