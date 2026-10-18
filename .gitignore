@@ -1,0 +1,25 @@
+# 运行产物
+歌单/
+增量/
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 密钥与本地配置（禁止入库）
+.env
+.env.*
+*.key
+*.pem
+secrets.*
+config.local.*
