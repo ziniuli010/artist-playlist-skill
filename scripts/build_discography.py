@@ -35,7 +35,7 @@ try:
 except ImportError:                                   # pragma: no cover
     from .sources import get_source, SourceError
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # 巡演/Live/精选/合辑/伴奏/翻唱等不属于「录音室专辑」的标记
 DEFAULT_EXCLUDE = ("演唱会,音乐会,拉阔,现场,Concert,Tour,Dome,Unplugged,"
@@ -53,17 +53,22 @@ LIVE_WHITELIST = ("live for today",)
 BAD_VER = ("remaster", "deluxe", "edited", "rough mix", "expanded", "bonus",
            "special edition", "anniversary", "complete edition", "重制", "纪念版")
 
-# 原声带：本人占比达标的整张保留
+# 原声带：默认整张排除（电影/剧集配乐多为十几秒的过场，听感割裂）
 OST_MARKS = ("原声带", "原声", "OST", "Soundtrack")
-OST_MIN_RATIO = 0.3
+OST_MIN_RATIO = 0.3              # 仅在 --keep-interludes 时用于判掉拼盘型原声带
 COMPILATION_MIN_RATIO = 0.2      # 非原声带专辑：曲目≥8 且本人占比低于此值 → 视为拼盘
 COMPILATION_MIN_TRACKS = 8
+
+# 短序曲/过场曲：整曲名只有 Intro / Outro / 前奏等（不含副标题），默认排除
+SHORT_TRACK = re.compile(
+    r"^\s*(intro|outro|interlude|prelude|序曲|前奏|开场|间奏)\s*[\d\-–—:：.]*\s*$", re.I)
 
 DEFAULTS = {
     "types": "专辑",
     "min_tracks": 0,
     "exclude": DEFAULT_EXCLUDE,
     "keep_all": False,
+    "keep_interludes": False,
     "no_dedupe": False,
     "singers": "primary",
     "include_featured": False,
@@ -205,6 +210,12 @@ def build_records(albums, fetch_tracks, aname, opts=None, log=None):
         ratio = self_cnt / len(tracks) if tracks else 0
         is_ost = any(k.lower() in (al.get("name") or "").lower() for k in OST_MARKS)
 
+        # 5.5) 原声带默认整张排除
+        if is_ost and not o["keep_interludes"]:
+            zero_note.append((al["name"], "电影/电视原声带，按规则排除"))
+            say(f"  [{step:02d}/{len(albums)}] {date} {al['name'][:36]} (跳过：原声带)")
+            continue
+
         # 6) 拼盘判定（仅在源提供演唱者信息时可靠；降级源常缺该字段）
         if named and (
             (is_ost and ratio < OST_MIN_RATIO) or
@@ -221,6 +232,10 @@ def build_records(albums, fetch_tracks, aname, opts=None, log=None):
             if not t.get("name"):
                 continue
             names = t.get("artists") or []
+            # 6.5) 短序曲/过场曲排除
+            if not o["keep_interludes"] and SHORT_TRACK.match(t["name"]):
+                other += 1
+                continue
             # 7) 演唱者过滤（原声带整张保留；降级源放宽）
             if names and not o["include_featured"] and not is_ost and not o["lenient_artists"]:
                 if not any(aname == n or aname in n or n in aname for n in names):
@@ -367,6 +382,8 @@ def build_parser():
     ap.add_argument("--exclude", default=DEFAULT_EXCLUDE, help="专辑名命中即跳过，逗号分隔")
     ap.add_argument("--xalbum", default="", help="精确排除指定专辑（子串），逗号分隔")
     ap.add_argument("--keep-all", action="store_true", help="忽略 --exclude 与 Live 判定")
+    ap.add_argument("--keep-interludes", action="store_true",
+                    help="保留电影/电视原声带与 Intro/序曲 等短曲（默认排除）")
     ap.add_argument("--no-dedupe", action="store_true", help="关闭跨专辑去重")
     ap.add_argument("--singers", default="primary", choices=["primary", "full"])
     ap.add_argument("--include-featured", action="store_true", help="保留他人演唱曲目")

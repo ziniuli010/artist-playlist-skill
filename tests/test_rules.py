@@ -104,14 +104,14 @@ class TestPipeline(unittest.TestCase):
             cls.albums, lambda aid: cls.tracks.get(aid, []), cls.artist, {}, log=None)
 
     def test_total_count(self):
-        # a1:3 + a5:2(甲被去重) + a7:5(原声带整张保留) = 10
-        self.assertEqual(len(self.records), 10)
+        # a1:3 + a5:2(甲被去重)；原声带 a7 默认整张排除
+        self.assertEqual(len(self.records), 5)
 
     def test_deluxe_does_not_win_over_regular(self):
         # a1 与 a2 同专辑，正式版 3 首优先，Deluxe 独有的「丁」不进入
         titles = [r["title"] for r in self.records]
         self.assertNotIn("丁", titles)
-        self.assertEqual(self.stats["albums_used"], 3)
+        self.assertEqual(self.stats["albums_used"], 2)
 
     def test_live_album_excluded(self):
         titles = [r["title"] for r in self.records]
@@ -132,10 +132,18 @@ class TestPipeline(unittest.TestCase):
         self.assertNotIn("群星合作企划", [r["album"] for r in self.records])
         self.assertTrue(any("群星合作企划" == n for n, _ in self.zero))
 
-    def test_ost_kept_when_self_ratio_high(self):
-        # 5 首里本人 3 首（60% ≥ 30%）→ 整张保留，含他人配乐
+    def test_ost_excluded_by_default(self):
+        # 原声带默认整张排除（电影配乐多为过场短曲）
         albums = [r["album"] for r in self.records]
-        self.assertEqual(albums.count("某电影原声带"), 5)
+        self.assertNotIn("某电影原声带", albums)
+        self.assertTrue(any(n == "某电影原声带" for n, _ in self.zero))
+
+    def test_ost_kept_with_flag(self):
+        # --keep-interludes 时恢复旧行为
+        recs, _, _, _ = bd.build_records(
+            self.albums, lambda aid: self.tracks.get(aid, []), self.artist,
+            {"keep_interludes": True}, log=None)
+        self.assertEqual([r["album"] for r in recs].count("某电影原声带"), 5)
 
     def test_ost_skipped_when_self_ratio_low(self):
         # 10 首里本人 1 首（10% < 30%）→ 整张跳过
